@@ -9,6 +9,7 @@ from docx import Document
 import os
 import configparser
 import time
+import re
 
 # Load credentials from config.ini
 config = configparser.ConfigParser()
@@ -25,7 +26,7 @@ urls = df['URL'].dropna().tolist()
 
 # Configure Selenium (headless Chrome)
 chrome_options = Options()
-chrome_options.add_argument("--headless")  # Run without opening browser window
+chrome_options.add_argument("--headless")
 chrome_options.add_argument("--disable-gpu")
 chrome_options.add_argument("--no-sandbox")
 
@@ -36,36 +37,37 @@ driver = webdriver.Chrome(service=service, options=chrome_options)
 output_dir = "word_exports"
 os.makedirs(output_dir, exist_ok=True)
 
-# Login to ServiceNow (if needed)
+# Login to ServiceNow
 driver.get("https://your-instance.service-now.com/login.do")
 time.sleep(3)
-
-# Fill login form
 driver.find_element(By.ID, "user_name").send_keys(USERNAME)
 driver.find_element(By.ID, "user_password").send_keys(PASSWORD)
 driver.find_element(By.ID, "sysverb_login").click()
-time.sleep(5)  # Wait for login to complete
+time.sleep(5)
 
 # Crawl each URL and export content to Word
 for url in urls:
     driver.get(url)
-    time.sleep(5)  # Wait for page to load fully
+    time.sleep(5)
 
     # Extract rendered HTML
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     page_text = soup.get_text(separator=' ', strip=True)
 
+    # Get page title
+    title = soup.title.string if soup.title else "Untitled"
+    # Clean title for filename
+    safe_title = re.sub(r'[\\\\/:*?"<>|]', '_', title)
+
     # Create Word document
     doc = Document()
-    doc.add_heading(f"Extracted Content from {url}", level=1)
+    doc.add_heading(title, level=1)
     doc.add_paragraph(page_text)
 
-    # Generate safe filename
-    safe_filename = url.replace("https://", "").replace("/", "_").replace("?", "_").replace("=", "_")
-    word_file_path = os.path.join(output_dir, f"{safe_filename}.docx")
-
+    # Save Word file using page title
+    word_file_path = os.path.join(output_dir, f"{safe_title}.docx")
     doc.save(word_file_path)
-    print(f"✅ Saved content from {url} to {word_file_path}")
+    print(f"✅ Saved content from {url} as '{safe_title}.docx'")
 
 driver.quit()
 print(f"✅ All pages processed. Word files saved in '{output_dir}' directory.")
