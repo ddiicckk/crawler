@@ -1,0 +1,1 @@
+pip install pandas openpyxl requests beautifulsoup4 python-docx
