@@ -1,10 +1,14 @@
 
 import pandas as pd
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 from docx import Document
 import os
 import configparser
+import time
 
 # Load credentials from config.ini
 config = configparser.ConfigParser()
@@ -19,39 +23,49 @@ excel_file = "pages.xlsx"  # Ensure this file exists in the same directory
 df = pd.read_excel(excel_file, engine='openpyxl')
 urls = df['URL'].dropna().tolist()
 
-# Create a session for authentication
-session = requests.Session()
-session.auth = (USERNAME, PASSWORD)
+# Configure Selenium (headless Chrome)
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Run without opening browser window
+chrome_options.add_argument("--disable-gpu")
+chrome_options.add_argument("--no-sandbox")
 
-# Optional headers to mimic a browser
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-}
+service = Service("/path/to/chromedriver")  # Update with your chromedriver path
+driver = webdriver.Chrome(service=service, options=chrome_options)
 
 # Create output directory for Word files
 output_dir = "word_exports"
 os.makedirs(output_dir, exist_ok=True)
 
-# Crawl each URL and export content to separate Word files
+# Login to ServiceNow (if needed)
+driver.get("https://your-instance.service-now.com/login.do")
+time.sleep(3)
+
+# Fill login form
+driver.find_element(By.ID, "user_name").send_keys(USERNAME)
+driver.find_element(By.ID, "user_password").send_keys(PASSWORD)
+driver.find_element(By.ID, "sysverb_login").click()
+time.sleep(5)  # Wait for login to complete
+
+# Crawl each URL and export content to Word
 for url in urls:
-    response = session.get(url, headers=headers)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.text, 'html.parser')
-        page_text = soup.get_text(separator=' ', strip=True)
+    driver.get(url)
+    time.sleep(5)  # Wait for page to load fully
 
-        # Create a Word document
-        doc = Document()
-        doc.add_heading(f"Extracted Content from {url}", level=1)
-        doc.add_paragraph(page_text)
+    # Extract rendered HTML
+    soup = BeautifulSoup(driver.page_source, 'html.parser')
+    page_text = soup.get_text(separator=' ', strip=True)
 
-        # Generate a safe filename based on the URL
-        safe_filename = url.replace("https://", "").replace("/", "_").replace("?", "_").replace("=", "_")
-        word_file_path = os.path.join(output_dir, f"{safe_filename}.docx")
+    # Create Word document
+    doc = Document()
+    doc.add_heading(f"Extracted Content from {url}", level=1)
+    doc.add_paragraph(page_text)
 
-        # Save the Word file
-        doc.save(word_file_path)
-        print(f"✅ Saved content from {url} to {word_file_path}")
-    else:
-        print(f"❌ Error fetching {url}: {response.status_code}")
+    # Generate safe filename
+    safe_filename = url.replace("https://", "").replace("/", "_").replace("?", "_").replace("=", "_")
+    word_file_path = os.path.join(output_dir, f"{safe_filename}.docx")
 
+    doc.save(word_file_path)
+    print(f"✅ Saved content from {url} to {word_file_path}")
+
+driver.quit()
 print(f"✅ All pages processed. Word files saved in '{output_dir}' directory.")
