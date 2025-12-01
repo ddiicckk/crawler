@@ -1,54 +1,61 @@
 
 import pandas as pd
+import json
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service
-from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from docx import Document
 import os
-import configparser
-import time
 import re
+from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
-# Load credentials from config.ini
-config = configparser.ConfigParser()
-config.read('config.ini')
-USERNAME = config['servicenow']['username']
-PASSWORD = config['servicenow']['password']
-
-# Excel file name
+# ✅ Read URLs from Excel file
 excel_file = "pages.xlsx"  # Ensure this file exists in the same directory
-
-# Read URLs from Excel file (assuming column name is 'URL')
 df = pd.read_excel(excel_file, engine='openpyxl')
 urls = df['URL'].dropna().tolist()
 
-# Configure Selenium for Edge (headless mode)
+# ✅ Configure Selenium for Edge (using WebDriver Manager)
 edge_options = Options()
-edge_options.add_argument("--headless")
+# edge_options.add_argument("--headless")  # Uncomment for headless mode
 edge_options.add_argument("--disable-gpu")
 edge_options.add_argument("--no-sandbox")
 
-service = Service("C:/path/to/msedgedriver.exe")  # Update with your Edge WebDriver path
+service = Service(EdgeChromiumDriverManager().install())
 driver = webdriver.Edge(service=service, options=edge_options)
 
-# Create output directory for Word files
+# ✅ Open base URL
+base_url = "https://myservice.lloyds.com"
+driver.get(base_url)
+
+# ✅ Load cookies from cookies.json
+with open("cookies.json", "r") as f:
+    cookies = json.load(f)
+
+for cookie in cookies:
+    # Selenium expects 'name' and 'value'
+    driver.add_cookie({
+        'name': cookie['name'],
+        'value': cookie['value'],
+        'domain': cookie['domain']
+    })
+
+# ✅ Refresh page to apply cookies
+driver.refresh()
+
+# ✅ Create output directory for Word files
 output_dir = "word_exports"
 os.makedirs(output_dir, exist_ok=True)
 
-# Login to ServiceNow
-driver.get("https://your-instance.service-now.com/login.do")
-time.sleep(3)
-driver.find_element(By.ID, "user_name").send_keys(USERNAME)
-driver.find_element(By.ID, "user_password").send_keys(PASSWORD)
-driver.find_element(By.ID, "sysverb_login").click()
-time.sleep(5)
-
-# Crawl each URL and export content to Word
+# ✅ Crawl each URL and export content to Word
 for url in urls:
     driver.get(url)
-    time.sleep(5)
+
+    # Wait for page to load fully
+    WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
 
     # Extract rendered HTML
     soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -61,6 +68,7 @@ for url in urls:
     # Create Word document
     doc = Document()
     doc.add_heading(title, level=1)
+    doc.add_paragraph(f"Source URL: {url}\n\n")
     doc.add_paragraph(page_text)
 
     # Save Word file using page title
