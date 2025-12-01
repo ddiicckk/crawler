@@ -4,17 +4,20 @@ import requests
 from bs4 import BeautifulSoup
 from docx import Document
 import os
+import configparser
 
-# Excel file name (update if needed)
+# Load credentials from config.ini
+config = configparser.ConfigParser()
+config.read('config.ini')
+USERNAME = config['servicenow']['username']
+PASSWORD = config['servicenow']['password']
+
+# Excel file name
 excel_file = "pages.xlsx"  # Ensure this file exists in the same directory
 
 # Read URLs from Excel file (assuming column name is 'URL')
 df = pd.read_excel(excel_file, engine='openpyxl')
 urls = df['URL'].dropna().tolist()
-
-# Authentication credentials
-USERNAME = "your_username"
-PASSWORD = "your_password"
 
 # Create a session for authentication
 session = requests.Session()
