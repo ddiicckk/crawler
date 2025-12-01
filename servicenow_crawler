@@ -1,0 +1,54 @@
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from docx import Document
+import os
+
+# Excel file name (update if needed)
+excel_file = "pages.xlsx"  # Ensure this file exists in the same directory
+
+# Read URLs from Excel file (assuming column name is 'URL')
+df = pd.read_excel(excel_file, engine='openpyxl')
+urls = df['URL'].dropna().tolist()
+
+# Authentication credentials
+USERNAME = "your_username"
+PASSWORD = "your_password"
+
+# Create a session for authentication
+session = requests.Session()
+session.auth = (USERNAME, PASSWORD)
+
+# Optional headers to mimic a browser
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+}
+
+# Create output directory for Word files
+output_dir = "word_exports"
+os.makedirs(output_dir, exist_ok=True)
+
+# Crawl each URL and export content to separate Word files
+for url in urls:
+    response = session.get(url, headers=headers)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        page_text = soup.get_text(separator=' ', strip=True)
+
+        # Create a Word document
+        doc = Document()
+        doc.add_heading(f"Extracted Content from {url}", level=1)
+        doc.add_paragraph(page_text)
+
+        # Generate a safe filename based on the URL
+        safe_filename = url.replace("https://", "").replace("/", "_").replace("?", "_").replace("=", "_")
+        word_file_path = os.path.join(output_dir, f"{safe_filename}.docx")
+
+        # Save the Word file
+        doc.save(word_file_path)
+        print(f"✅ Saved content from {url} to {word_file_path}")
+    else:
+        print(f"❌ Error fetching {url}: {response.status_code}")
+
+print(f"✅ All pages processed. Word files saved in '{output_dir}' directory.")
