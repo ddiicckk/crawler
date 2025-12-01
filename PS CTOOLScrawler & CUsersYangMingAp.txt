@@ -1,49 +1,95 @@
 PS C:\TOOLS\crawler> & C:/Users/YangMing/AppData/Local/Programs/Python/Python311/python.exe c:/TOOLS/crawler/servicenow_crawler.py
-[29320:28468:1201/151001.997:ERROR:components\edge_ess\vbs_encoder.cc:100] LoadEnclaveImageW failed, error code 577
-
-DevTools listening on ws://127.0.0.1:50604/devtools/browser/dd00da3b-1d1e-4870-8426-b6b18441b5e5
-[29320:28344:1201/151003.426:ERROR:chrome\browser\importer\edge_china_browsers\edge_qqbrowser_importer_utils_win.cc:163] QQBrowser user data path not found.
-[29320:28468:1201/151005.188:ERROR:components\edge_smartscreen\browser\smartscreen_dns_resolver.cc:109] SmartScreenDnsResolver::OnComplete Error: -105 DidTimeOut: 0 URL: https://your-instance.service-now.com/login.do
-[29320:28468:1201/151007.208:ERROR:components\edge_smartscreen\browser\smartscreen_dns_resolver.cc:109] SmartScreenDnsResolver::OnComplete Error: -105 DidTimeOut: 0 URL: https://your-instance.service-now.com/login.do
 Traceback (most recent call last):
-  File "c:\TOOLS\crawler\servicenow_crawler.py", line 41, in <module>
-    driver.get("https://your-instance.service-now.com/login.do")
-  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 483, in get
-    self.execute(Command.GET, {"url": url})
-  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 458, in execute
-    self.error_handler.check_response(response)
-  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 233, in check_response
-    raise exception_class(message, screen, stacktrace)
-selenium.common.exceptions.WebDriverException: Message: unknown error: net::ERR_NAME_NOT_RESOLVED
-  (Session info: MicrosoftEdge=142.0.3595.94)
-Stacktrace:
-Symbols not available. Dumping unresolved backtrace:
-        0x7ff73f2ca715
-        0x7ff73f2ca774
-        0x7ff73f47c558
-        0x7ff73f03af21
-        0x7ff73f0301d7
-        0x7ff73f0317a1
-        0x7ff73f0305de
-        0x7ff73f030035
-        0x7ff73f02fddf
-        0x7ff73f02df81
-        0x7ff73f02e58c
-        0x7ff73f0408a0
-        0x7ff73f0bec5e
-        0x7ff73f0a3c8a
-        0x7ff73f07b3d5
-        0x7ff73f0be6f2
-        0x7ff73f07a8aa
-        0x7ff73f079bd1
-        0x7ff73f07a6d3
-        0x7ff73f1381f4
-        0x7ff73f134717
-        0x7ff73f2f7375
-        0x7ff73f2e57d1
-        0x7ff73f2edc79
-        0x7ff73f2d1c64
-        0x7ff73f2d1db3
-        0x7ff73f2bfae6
-        0x7fff3030259d
-        0x7fff3140af78
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\util\connection.py", line 60, in create_connection
+    for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 962, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen   
+    response = self._make_request(
+               ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connection.py", line 753, in connect       
+    self.sock = sock = self._new_conn()
+                       ^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connection.py", line 205, in _new_conn     
+    raise NameResolutionError(self.host, self, e) from e
+urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000028FCC165C10>: Failed to resolve 'msedgedriver.azureedge.net' ([Errno 11001] getaddrinfo failed)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen   
+    retries = retries.increment(
+              ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\urllib3\util\retry.py", line 519, in increment     
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='msedgedriver.azureedge.net', port=443): Max retries exceeded with url: /LATEST_RELEASE_142_WINDOWS (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000028FCC165C10>: Failed to resolve 'msedgedriver.azureedge.net' ([Errno 11001] getaddrinfo failed)"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\http.py", line 32, in get   
+    resp = requests.get(
+           ^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\sessions.py", line 589, in request        
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='msedgedriver.azureedge.net', port=443): Max retries exceeded with url: /LATEST_RELEASE_142_WINDOWS (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000028FCC165C10>: Failed to resolve 'msedgedriver.azureedge.net' ([Errno 11001] getaddrinfo failed)"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "c:\TOOLS\crawler\servicenow_crawler.py", line 27, in <module>
+    service = Service(EdgeChromiumDriverManager().install())
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\microsoft.py", line 73, in install
+    driver_path = self._get_driver_binary_path(self.driver)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\manager.py", line 35, in _get_driver_binary_path
+    binary_path = self._cache_manager.find_driver(driver)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\driver_cache.py", line 107, in find_driver
+    driver_version = self.get_cache_key_driver_version(driver)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\driver_cache.py", line 154, in get_cache_key_driver_version
+    return driver.get_driver_version_to_download()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\driver.py", line 48, in get_driver_version_to_download
+    return self.get_latest_release_version()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\drivers\edge.py", line 51, in get_latest_release_version
+    resp = self._http_client.get(url=latest_release_url)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\webdriver_manager\core\http.py", line 35, in get   
+    raise exceptions.ConnectionError(f"Could not reach host. Are you offline?")
+requests.exceptions.ConnectionError: Could not reach host. Are you offline?
