@@ -16,10 +16,11 @@ def clean_article(article):
         ad_tag.decompose()
     return article
 
-# Sanitize file names
+# Sanitize file names but allow Chinese and other Unicode characters
 def sanitize_filename(name):
-    name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-    return name[:50]
+    invalid_chars = r'[\\/:*?"<>|]'  # Remove only invalid characters
+    name = re.sub(invalid_chars, '_', name)
+    return name[:100]  # Limit length for OS safety
 
 # Read URLs from Excel file
 def read_urls_from_excel(file_path):
@@ -39,6 +40,7 @@ def crawl_and_save_separately(urls, output_dir):
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
+            # Find main article content
             article = soup.find('article') or soup.find('div', class_='content') or soup.find('div', class_='post')
             if not article:
                 print(f"Could not find article content for {url}")
@@ -47,10 +49,12 @@ def crawl_and_save_separately(urls, output_dir):
             article = clean_article(article)
             paragraphs = [p.get_text(strip=True) for p in article.find_all('p') if p.get_text(strip=True)]
 
+            # Use page title or URL as filename
             title = soup.title.string if soup.title else url
             filename = sanitize_filename(title) + ".docx"
             filepath = os.path.join(output_dir, filename)
 
+            # Create Word document
             doc = Document()
             title_paragraph = doc.add_paragraph(title, style='Title')
             title_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -62,10 +66,10 @@ def crawl_and_save_separately(urls, output_dir):
                 run.font.size = Pt(12)
 
             doc.save(filepath)
-            print(f"Saved article from {url} to {filepath}")
+            print(f"✅ Saved article from {url} to {filepath}")
 
         except Exception as e:
-            print(f"Error processing {url}: {e}")
+            print(f"❌ Error processing {url}: {e}")
 
 # Example usage:
 excel_file = "urls.xlsx"  # Your Excel file with a column named 'URL'
