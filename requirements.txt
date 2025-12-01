@@ -1,1 +1,2 @@
 pip install pandas openpyxl requests beautifulsoup4 python-docx
+pip install selenium beautifulsoup4 python-docx pandas openpyxl
