@@ -17,7 +17,7 @@ def sanitize_filename(name):
 def text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
-def urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folder):
+def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_folder):
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
 
@@ -39,17 +39,18 @@ def urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folde
             file_name = sanitize_filename(page_title[:100]) + ".docx"
             file_path = os.path.join(output_folder, file_name)
 
-            # Find main content block
-            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=re.compile(r'(content|article|post|body)'))
+            # Find <article> block
+            main_content = soup.find('article')
             if not main_content:
-                main_content = soup
+                print(f"WARNING: No <article> found for {url}, skipping.")
+                continue
 
             doc = Document()
             doc.add_heading(page_title, level=0)
             doc.add_paragraph(f"Source URL: {url}")
 
             seen_hashes = set()
-            for element in main_content.find_all(['div', 'img']):  # Only div and img
+            for element in main_content.find_all(['div', 'p', 'img']):  # Exclude <li>
                 if element.name == 'img':
                     img_url = element.get('src') or element.get('data-src')
                     if img_url:
@@ -74,7 +75,7 @@ def urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folde
                             doc.add_paragraph(text)
 
             doc.save(file_path)
-            print(f"Saved clean div content: {file_path}")
+            print(f"Saved article content: {file_path}")
 
         except Exception as e:
             print(f"Error processing {url}: {e}")
@@ -86,6 +87,6 @@ if __name__ == "__main__":
     excel_file = "urls.xlsx"
     sheet_name = "Sheet1"
     url_column = "URL"
-    output_folder = "div_content_pages"
+    output_folder = "article_content_pages"
 
-    urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folder)
+    urls_from_excel_article_content(excel_file, sheet_name, url_column, output_folder)
