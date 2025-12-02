@@ -90,3 +90,4 @@ sheet_name = "Sheet1"
 url_column = "URL"
 output_folder = "clean_main_content_pages"
 
+urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, output_folder)
