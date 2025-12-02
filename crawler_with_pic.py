@@ -9,12 +9,15 @@ from PIL import Image
 import re
 import os
 from urllib.parse import urljoin
+import hashlib
 
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
-def urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, output_folder):
-    # Read URLs from Excel
+def text_hash(text):
+    return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+def urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, output_folder):
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
 
@@ -26,7 +29,7 @@ def urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, outpu
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Remove header, footer, nav, and common sidebars
+            # Remove header, footer, nav, aside
             for tag in soup.find_all(['header', 'footer', 'nav', 'aside']):
                 tag.decompose()
 
@@ -39,14 +42,13 @@ def urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, outpu
             # Find main content block
             main_content = soup.find('main') or soup.find('article') or soup.find('div', class_=re.compile(r'(content|article|post|body)'))
             if not main_content:
-                main_content = soup  # fallback
+                main_content = soup
 
             doc = Document()
             doc.add_heading(page_title, level=0)
             doc.add_paragraph(f"Source URL: {url}")
 
-            # Process elements in order: text + images inline
-            seen_text = set()
+            seen_hashes = set()
             for element in main_content.find_all(['h1', 'h2', 'h3', 'p', 'li', 'img']):
                 if element.name == 'img':
                     img_url = element.get('src') or element.get('data-src')
@@ -65,15 +67,17 @@ def urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, outpu
                             doc.add_paragraph("Image could not be added.")
                 else:
                     text = element.get_text(strip=True)
-                    if text and text not in seen_text:
-                        seen_text.add(text)
-                        if element.name.startswith('h'):
-                            doc.add_heading(text, level=int(element.name[1]))
-                        else:
-                            doc.add_paragraph(text)
+                    if text and len(text) > 30:  # skip very short fragments
+                        h = text_hash(text)
+                        if h not in seen_hashes:
+                            seen_hashes.add(h)
+                            if element.name.startswith('h'):
+                                doc.add_heading(text, level=int(element.name[1]))
+                            else:
+                                doc.add_paragraph(text)
 
             doc.save(file_path)
-            print(f"Saved clean main content: {file_path}")
+            print(f"Saved clean content: {file_path}")
 
         except Exception as e:
             print(f"Error processing {url}: {e}")
@@ -86,4 +90,3 @@ sheet_name = "Sheet1"
 url_column = "URL"
 output_folder = "clean_main_content_pages"
 
-urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, output_folder)
