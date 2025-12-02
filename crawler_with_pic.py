@@ -69,7 +69,10 @@ def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_f
                         except Exception:
                             doc.add_paragraph("Image could not be added.")
                 else:
-                    text = element.get_text(strip=False)  # Keep markers and formatting
+                    # Logic: include <li> always, include <p> only if not inside <li>
+                    if element.name == 'p' and element.find_parent('li'):
+                        continue  # skip <p> inside <li>
+                    text = element.get_text(strip=False)
                     if text:
                         h = text_hash(text)
                         if h not in seen_hashes:
