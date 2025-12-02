@@ -18,9 +18,11 @@ def text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
 def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_folder):
+    # Read URLs from Excel
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
 
+    # Create output folder
     os.makedirs(output_folder, exist_ok=True)
 
     for idx, url in enumerate(urls, start=1):
@@ -50,7 +52,7 @@ def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_f
             doc.add_paragraph(f"Source URL: {url}")
 
             seen_hashes = set()
-            for element in main_content.find_all(['div', 'p', 'img']):  # Exclude <li>
+            for element in main_content.find_all(['div', 'p', 'li', 'img']):
                 if element.name == 'img':
                     img_url = element.get('src') or element.get('data-src')
                     if img_url:
@@ -68,7 +70,7 @@ def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_f
                             doc.add_paragraph("Image could not be added.")
                 else:
                     text = element.get_text(strip=True)
-                    if text and len(text) > 30:  # Skip short fragments
+                    if text:  # Keep all text, even short fragments
                         h = text_hash(text)
                         if h not in seen_hashes:
                             seen_hashes.add(h)
