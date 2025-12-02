@@ -17,7 +17,7 @@ def sanitize_filename(name):
 def text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
-def urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, output_folder):
+def urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folder):
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
 
@@ -49,7 +49,7 @@ def urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, outpu
             doc.add_paragraph(f"Source URL: {url}")
 
             seen_hashes = set()
-            for element in main_content.find_all(['h1', 'h2', 'h3', 'p', 'li', 'img']):
+            for element in main_content.find_all(['div', 'img']):  # Only div and img
                 if element.name == 'img':
                     img_url = element.get('src') or element.get('data-src')
                     if img_url:
@@ -67,17 +67,14 @@ def urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, outpu
                             doc.add_paragraph("Image could not be added.")
                 else:
                     text = element.get_text(strip=True)
-                    if text and len(text) > 30:  # skip very short fragments
+                    if text and len(text) > 30:  # Skip short fragments
                         h = text_hash(text)
                         if h not in seen_hashes:
                             seen_hashes.add(h)
-                            if element.name.startswith('h'):
-                                doc.add_heading(text, level=int(element.name[1]))
-                            else:
-                                doc.add_paragraph(text)
+                            doc.add_paragraph(text)
 
             doc.save(file_path)
-            print(f"Saved clean content: {file_path}")
+            print(f"Saved clean div content: {file_path}")
 
         except Exception as e:
             print(f"Error processing {url}: {e}")
@@ -85,9 +82,10 @@ def urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, outpu
     print(f"All files saved in folder: {output_folder}")
 
 # Example usage:
-excel_file = "urls.xlsx"
-sheet_name = "Sheet1"
-url_column = "URL"
-output_folder = "clean_main_content_pages"
+if __name__ == "__main__":
+    excel_file = "urls.xlsx"
+    sheet_name = "Sheet1"
+    url_column = "URL"
+    output_folder = "div_content_pages"
 
-urls_from_excel_clean_main_content(excel_file, sheet_name, url_column, output_folder)
+    urls_from_excel_div_content(excel_file, sheet_name, url_column, output_folder)
