@@ -17,7 +17,7 @@ def sanitize_filename(name):
 def text_hash(text):
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
-def urls_from_excel_article_p_img(excel_file, sheet_name, url_column, output_folder):
+def urls_from_excel_article_content(excel_file, sheet_name, url_column, output_folder):
     # Read URLs from Excel
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
@@ -52,7 +52,7 @@ def urls_from_excel_article_p_img(excel_file, sheet_name, url_column, output_fol
             doc.add_paragraph(f"Source URL: {url}")
 
             seen_hashes = set()
-            for element in main_content.find_all(['p', 'img']):  # Only <p> and <img>
+            for element in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'p', 'li', 'img']):
                 if element.name == 'img':
                     img_url = element.get('src') or element.get('data-src')
                     if img_url:
@@ -69,12 +69,16 @@ def urls_from_excel_article_p_img(excel_file, sheet_name, url_column, output_fol
                         except Exception:
                             doc.add_paragraph("Image could not be added.")
                 else:
-                    text = element.get_text(strip=False)  # Keep original markers
+                    text = element.get_text(strip=False)  # Keep markers and formatting
                     if text:
                         h = text_hash(text)
                         if h not in seen_hashes:
                             seen_hashes.add(h)
-                            doc.add_paragraph(text)
+                            if element.name.startswith('h'):
+                                level = int(element.name[1]) if element.name[1].isdigit() else 1
+                                doc.add_heading(text, level=level)
+                            else:
+                                doc.add_paragraph(text)
 
             doc.save(file_path)
             print(f"Saved article content: {file_path}")
@@ -89,6 +93,6 @@ if __name__ == "__main__":
     excel_file = "urls.xlsx"
     sheet_name = "Sheet1"
     url_column = "URL"
-    output_folder = "article_p_img_pages"
+    output_folder = "article_content_pages"
 
-    urls_from_excel_article_p_img(excel_file, sheet_name, url_column, output_folder)
+    urls_from_excel_article_content(excel_file, sheet_name, url_column, output_folder)
