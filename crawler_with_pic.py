@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)
 
-def urls_from_excel_inline_images(excel_file, sheet_name, url_column, output_folder):
+def urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, output_folder):
     # Read URLs from Excel
     df = pd.read_excel(excel_file, sheet_name=sheet_name)
     urls = df[url_column].dropna().tolist()
@@ -25,6 +25,10 @@ def urls_from_excel_inline_images(excel_file, sheet_name, url_column, output_fol
             response = requests.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Remove header, footer, nav, and common sidebars
+            for tag in soup.find_all(['header', 'footer', 'nav', 'aside']):
+                tag.decompose()
 
             # Get page title for filename
             title_tag = soup.find('title')
@@ -69,7 +73,7 @@ def urls_from_excel_inline_images(excel_file, sheet_name, url_column, output_fol
                             doc.add_paragraph(text)
 
             doc.save(file_path)
-            print(f"Saved with inline images: {file_path}")
+            print(f"Saved clean main content: {file_path}")
 
         except Exception as e:
             print(f"Error processing {url}: {e}")
@@ -80,6 +84,6 @@ def urls_from_excel_inline_images(excel_file, sheet_name, url_column, output_fol
 excel_file = "urls.xlsx"
 sheet_name = "Sheet1"
 url_column = "URL"
-output_folder = "inline_images_pages"
+output_folder = "clean_main_content_pages"
 
-urls_from_excel_inline_images(excel_file, sheet_name, url_column, output_folder)
+urls_from_excel_main_content_clean(excel_file, sheet_name, url_column, output_folder)
