@@ -5,18 +5,14 @@ ServiceNow Knowledge Crawler (Selenium + Word Export)
 
 - Reads URLs from Excel.
 - Logs in via SSO or Basic (username/password).
-- Extracts title + main content.
+- Handles classic UI frames (gsft_main) automatically.
+- Extracts title + main content using your selectors:
+    Title:  h1#articleTitleReadonly
+    Body:   div.kb-view-content-wrapper
 - Saves each article as a .docx file titled with the page title.
-
-CONFIG:
-- See config.ini in the same folder.
 
 USAGE:
 - python sn_kb_crawler_selenium.py
-
-Notes:
-- For SSO, non-headless is recommended to allow interactive authentication.
-- You may need to adjust the CSS selectors under "SELECTORS" based on your instance.
 """
 
 import os
@@ -35,6 +31,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
 
 # ---------------------------
 # Logging
@@ -156,7 +153,7 @@ def login_basic(driver, instance_url: str, username: str, password: str, wait_ti
     except Exception:
         logger.warning("Login page didn't load as expected; trying fallback waits.")
 
-    # 🔧 MODIFY HERE if your instance uses different IDs or a custom login page
+    # If your instance uses different IDs, update these selectors
     try:
         user_field = driver.find_element(By.ID, "user_name")
         pass_field = driver.find_element(By.ID, "user_password")
@@ -171,11 +168,9 @@ def login_basic(driver, instance_url: str, username: str, password: str, wait_ti
     pass_field.send_keys(password)
     login_btn.click()
 
-    # Wait for post-login navigation—presence of nav frame or avoidance of login URL
+    # Wait until we are past login
     try:
-        WebDriverWait(driver, wait_timeout).until_not(
-            EC.url_contains("login.do")
-        )
+        WebDriverWait(driver, wait_timeout).until_not(EC.url_contains("login.do"))
         logger.info("Basic login successful.")
     except Exception:
         logger.error("Login did not progress past login page. Check credentials/selectors.")
@@ -185,40 +180,51 @@ def login_basic(driver, instance_url: str, username: str, password: str, wait_ti
 def ensure_logged_in_sso(driver, first_target_url: str, wait_timeout: int):
     """
     For SSO: navigate to the first target URL and allow interactive auth.
-    This function waits until we are past the login and into the KB page.
     """
     logger.info("Starting SSO flow; navigate to first KB URL and complete any auth prompts.")
     driver.get(first_target_url)
 
-    # Wait until either the KB view content or at least we're off any login page.
+    # Wait until either the KB view content/frame or URL indicates we're at kb_view
     try:
         WebDriverWait(driver, wait_timeout).until(
             EC.any_of(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.kb_article_content")),
-                EC.presence_of_element_located((By.CSS_SELECTOR, "h1.kb-title")),
-                EC.url_contains("kb_view.do")
+                EC.presence_of_element_located((By.ID, "gsft_main")),
+                EC.url_contains("kb_view.do"),
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly")),
             )
         )
-        logger.info("SSO appears complete; content/URL detected.")
+        logger.info("SSO appears complete; KB page/frame detected.")
     except Exception:
         logger.warning("SSO wait timed out; you may need to complete auth manually and rerun.")
-        # Still proceed; users may have logged in but selectors differ.
+
+
+# ---------------------------
+# Frame handling (classic UI)
+# ---------------------------
+def switch_into_kb_frame_if_present(driver, wait_timeout: int) -> bool:
+    """
+    The classic UI often loads kb_view inside iframe#gsft_main.
+    This function tries to switch to that frame if present.
+    Returns True if switched, False if not found/needed.
+    """
+    try:
+        # Wait a bit for frame
+        WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.ID, "gsft_main"))
+        )
+        driver.switch_to.frame("gsft_main")
+        logger.debug("Switched into iframe#gsft_main.")
+        return True
+    except Exception:
+        # No frame found; page might already be the inner document
+        return False
 
 
 # ---------------------------
 # Content extraction
 # ---------------------------
-# 🔧 MODIFY HERE: Add/adjust selectors used in your ServiceNow theme
-CONTENT_SELECTORS = [
-    "div.kb_article_content",
-    "div.article-content",
-    "div#kb_content",
-    "div#article",
-    "div.kb-section",
-    "div#sc_content",       # sometimes used
-]
-
 TITLE_SELECTORS = [
+    "h1#articleTitleReadonly",  # your selector
     "h1.kb-title",
     "h1#article_title",
     "h1.article-title",
@@ -226,21 +232,18 @@ TITLE_SELECTORS = [
     "h1",
 ]
 
-def extract_title_and_content(driver, wait_timeout: int) -> tuple[str, str]:
-    """
-    Extract a reasonable title and main content text using multiple selectors,
-    with fallback to page <title> and body text.
-    """
-    # Wait briefly for any KB content to render
-    try:
-        WebDriverWait(driver, wait_timeout).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, ", ".join(CONTENT_SELECTORS)))
-        )
-    except Exception:
-        # Continue; we'll try fallbacks
-        pass
+CONTENT_SELECTORS = [
+    "div.kb-view-content-wrapper",  # your selector
+    "div.kb_article_content",
+    "div.article-content",
+    "div#kb_content",
+    "div#article",
+    "div.kb-section",
+    "div#sc_content",
+]
 
-    html = driver.page_source
+def extract_title_and_content_from_html(html: str) -> tuple[str, str]:
+    """Parse HTML and extract title + content using selector lists."""
     soup = BeautifulSoup(html, "lxml")
 
     # Title
@@ -251,19 +254,19 @@ def extract_title_and_content(driver, wait_timeout: int) -> tuple[str, str]:
             title_text = node.get_text(strip=True)
             break
     if not title_text:
-        # Fallback: browser tab title
-        title_text = driver.title.strip() if driver.title else "Untitled"
+        # Fallback: <title> or Untitled
+        page_title = soup.select_one("title")
+        title_text = page_title.get_text(strip=True) if page_title else "Untitled"
 
     # Content
     content_text = None
     for sel in CONTENT_SELECTORS:
         node = soup.select_one(sel)
         if node:
-            # Convert to readable text while keeping line breaks
             content_text = node.get_text(separator="\n", strip=True)
             break
     if not content_text:
-        # Fallback: use the entire body text
+        # Fallback: entire body text
         body = soup.select_one("body")
         content_text = body.get_text(separator="\n", strip=True) if body else "No content found."
 
@@ -276,12 +279,16 @@ def save_to_word(output_folder: Path, title: str, content: str) -> Path:
     path = ensure_unique_path(output_folder, fname, ".docx")
     doc = Document()
     doc.add_heading(title, 0)
+
     # Split into paragraphs by blank lines or newlines
     for para in re.split(r"\n{2,}", content.strip()):
-        for line in para.split("\n"):
+        lines = [ln for ln in para.split("\n") if ln.strip() != ""]
+        if not lines:
+            continue
+        for line in lines:
             doc.add_paragraph(line)
-        # Optional: add a blank line between sections
-        doc.add_paragraph("")
+        doc.add_paragraph("")  # spacer between sections
+
     doc.save(path)
     return path
 
@@ -333,7 +340,29 @@ def main():
                 logger.info(f"[{idx}/{len(urls)}] Opening: {url}")
                 driver.get(url)
 
-                title, content = extract_title_and_content(driver, wait_timeout)
+                # Try switching into classic UI KB iframe if present
+                switched = switch_into_kb_frame_if_present(driver, wait_timeout)
+
+                # Wait for either the title or the content selector to be present
+                try:
+                    WebDriverWait(driver, wait_timeout).until(
+                        EC.any_of(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly")),
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "div.kb-view-content-wrapper"))
+                        )
+                    )
+                except Exception:
+                    # Continue anyway; we'll parse what we have
+                    pass
+
+                # Get HTML from the right context: inside frame if switched, else main page
+                html = driver.page_source
+
+                # If we switched into iframe, go back to default to be safe for next URL
+                if switched:
+                    driver.switch_to.default_content()
+
+                title, content = extract_title_and_content_from_html(html)
                 saved_path = save_to_word(output_folder, title, content)
                 logger.info(f"Saved: {saved_path.name}")
 
