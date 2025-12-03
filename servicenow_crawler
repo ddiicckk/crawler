@@ -1,10 +1,11 @@
 
 #!/usr/bin/env python3
 """
-ServiceNow Knowledge Crawler (Selenium + Word Export)
+ServiceNow Knowledge Article Crawler
 - Reads URLs from Excel
 - Logs in via SSO or Basic
-- Extracts title and content using:
+- Handles classic UI iframe (gsft_main)
+- Extracts:
     Title:  h1#articleTitleReadonly
     Content: div#article
 - Saves each article as .docx
@@ -27,9 +28,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# ---------------------------
 # Logging
+# ---------------------------
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
-logger = logging.getLogger("sn_kb_crawler")
+logger = logging.getLogger("servicenow_crawler")
 
 INVALID_CHARS = r'[\\/:*?"<>|]'
 
@@ -96,12 +99,11 @@ def login_basic(driver, instance_url, username, password, wait_timeout):
 def ensure_logged_in_sso(driver, first_url, wait_timeout):
     driver.get(first_url)
     logger.info("Complete SSO login manually if prompted...")
-    WebDriverWait(driver, wait_timeout).until(
-        EC.any_of(
-            EC.presence_of_element_located((By.ID, "gsft_main")),
-            EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly"))
-        )
-    )
+    try:
+        WebDriverWait(driver, wait_timeout).until(EC.url_contains("kb_view.do"))
+        logger.info("SSO login successful.")
+    except:
+        logger.warning("SSO wait timed out. Complete login manually and rerun if needed.")
 
 def switch_into_frame(driver):
     try:
@@ -139,7 +141,7 @@ def main():
     password = sn.get("password", "")
     browser = sn.get("browser", "chrome")
     headless = sn.getboolean("headless", False)
-    wait_timeout = sn.getint("wait_timeout", 25)
+    wait_timeout = sn.getint("wait_timeout", 60)  # Increased timeout
     excel_path = sn.get("urls_excel", "urls.xlsx")
     sheet = sn.get("excel_sheet", None)
     url_col = sn.get("url_column", None)
@@ -159,6 +161,8 @@ def main():
             logger.info(f"[{idx}/{len(urls)}] Processing: {url}")
             driver.get(url)
             switched = switch_into_frame(driver)
+            if switched:
+                logger.info("Switched into gsft_main iframe.")
             WebDriverWait(driver, wait_timeout).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly"))
             )
