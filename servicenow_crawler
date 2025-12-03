@@ -136,3 +136,48 @@ def main():
     headless = sn.getboolean("headless", False)
     wait_timeout = sn.getint("wait_timeout", 90)  # Increased timeout
     excel_path = sn.get("urls_excel", "urls.xlsx")
+    sheet = sn.get("excel_sheet", None)
+    url_col = sn.get("url_column", None)
+    output_folder = Path(sn.get("output_folder", "output"))
+    delay_seconds = sn.getfloat("delay_seconds", 1.0)
+
+    urls = read_urls_from_excel(excel_path, sheet, url_col)
+    driver = create_driver(browser, headless)
+
+    try:
+        if login_mode == "basic":
+            login_basic(driver, instance_url, username, password, wait_timeout)
+        else:
+            ensure_logged_in_sso(driver, urls[0], wait_timeout)
+
+        for idx, url in enumerate(urls, start=1):
+            logger.info(f"[{idx}/{len(urls)}] Processing: {url}")
+            driver.get(url)
+
+            # Wait for iframe and switch
+            try:
+                WebDriverWait(driver, wait_timeout).until(
+                    EC.presence_of_element_located((By.ID, "gsft_main"))
+                )
+                driver.switch_to.frame("gsft_main")
+                logger.info("Switched into gsft_main iframe.")
+            except:
+                logger.warning("No iframe found; continuing on main page.")
+
+            # Wait for title inside iframe
+            WebDriverWait(driver, wait_timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly"))
+            )
+
+            html = driver.page_source
+            driver.switch_to.default_content()  # Reset for next URL
+
+            title, content = extract_title_and_content(html)
+            saved_path = save_to_word(output_folder, title, content)
+            logger.info(f"Saved: {saved_path.name}")
+            time.sleep(delay_seconds)
+    finally:
+        driver.quit()
+        logger.info("Done.")
+
+if __name__ == "__main__":
