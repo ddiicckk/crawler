@@ -2,17 +2,12 @@
 #!/usr/bin/env python3
 """
 ServiceNow Knowledge Crawler (Selenium + Word Export)
-
-- Reads URLs from Excel.
-- Logs in via SSO or Basic (username/password).
-- Handles classic UI frames (gsft_main) automatically.
-- Extracts title + main content using your selectors:
+- Reads URLs from Excel
+- Logs in via SSO or Basic
+- Extracts title and content using:
     Title:  h1#articleTitleReadonly
-    Body:   div.kb-view-content-wrapper
-- Saves each article as a .docx file titled with the page title.
-
-USAGE:
-- python sn_kb_crawler_selenium.py
+    Content: div#article
+- Saves each article as .docx
 """
 
 import os
@@ -32,31 +27,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
-# ---------------------------
 # Logging
-# ---------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logger = logging.getLogger("sn_kb_crawler")
 
-
-# ---------------------------
-# Helpers
-# ---------------------------
 INVALID_CHARS = r'[\\/:*?"<>|]'
 
 def sanitize_filename(name: str, max_len: int = 200) -> str:
-    """Sanitize filename by removing invalid characters and trimming length."""
     name = re.sub(INVALID_CHARS, "_", name).strip()
-    name = re.sub(r"\s+", " ", name)
     return name[:max_len] or "Untitled"
 
 def ensure_unique_path(folder: Path, base_name: str, ext: str = ".docx") -> Path:
-    """Ensure filename uniqueness by appending a counter if needed."""
     path = folder / f"{base_name}{ext}"
     counter = 1
     while path.exists():
@@ -64,312 +45,130 @@ def ensure_unique_path(folder: Path, base_name: str, ext: str = ".docx") -> Path
         counter += 1
     return path
 
-def load_config(cfg_path: str = "config.ini") -> configparser.ConfigParser:
+def load_config(cfg_path="config.ini"):
     cfg = configparser.ConfigParser()
     if not os.path.exists(cfg_path):
-        logger.error("config.ini not found. Please create it.")
+        logger.error("config.ini not found.")
         sys.exit(1)
     cfg.read(cfg_path)
     return cfg
 
-def read_urls_from_excel(excel_path: str, sheet: str | None, url_col: str | None) -> list[str]:
+def read_urls_from_excel(excel_path, sheet=None, url_col=None):
     if not os.path.exists(excel_path):
         logger.error(f"Excel file not found: {excel_path}")
         sys.exit(1)
-    try:
-        df = pd.read_excel(excel_path, sheet_name=sheet or 0, engine="openpyxl")
-    except Exception as e:
-        logger.error(f"Failed to read Excel: {e}")
-        sys.exit(1)
+    df = pd.read_excel(excel_path, sheet_name=sheet or 0, engine="openpyxl")
     if url_col and url_col in df.columns:
         urls = df[url_col].dropna().astype(str).tolist()
     else:
-        # Fallback: assume first column contains URLs
-        first_col = df.columns[0]
-        urls = df[first_col].dropna().astype(str).tolist()
-    # Basic URL sanity filter
-    urls = [u for u in urls if u.startswith("http")]
-    if not urls:
-        logger.error("No valid URLs found in Excel.")
-        sys.exit(1)
-    return urls
+        urls = df[df.columns[0]].dropna().astype(str).tolist()
+    return [u for u in urls if u.startswith("http")]
 
-
-# ---------------------------
-# WebDriver
-# ---------------------------
-def create_driver(browser: str, headless: bool):
-    browser = (browser or "chrome").lower()
+def create_driver(browser, headless):
+    browser = browser.lower()
     if browser == "chrome":
         from selenium.webdriver.chrome.options import Options
         opts = Options()
         if headless:
             opts.add_argument("--headless=new")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--no-sandbox")
         opts.add_argument("--window-size=1600,1000")
-        driver = webdriver.Chrome(options=opts)
+        return webdriver.Chrome(options=opts)
     elif browser == "edge":
         from selenium.webdriver.edge.options import Options
         opts = Options()
         if headless:
             opts.add_argument("--headless=new")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--no-sandbox")
-        opts.add_argument("--window-size=1600,1000")
-        driver = webdriver.Edge(options=opts)
-    elif browser == "firefox":
-        from selenium.webdriver.firefox.options import Options
-        opts = Options()
-        if headless:
-            opts.add_argument("--headless")
-        driver = webdriver.Firefox(options=opts)
+        return webdriver.Edge(options=opts)
     else:
-        logger.error(f"Unsupported browser: {browser}")
+        logger.error("Unsupported browser.")
         sys.exit(1)
-    driver.set_page_load_timeout(60)
-    return driver
 
-
-# ---------------------------
-# Login flows
-# ---------------------------
-def login_basic(driver, instance_url: str, username: str, password: str, wait_timeout: int):
-    """
-    Basic login using ServiceNow login page form fields.
-    Common IDs:
-      - user_name
-      - user_password
-      - sysverb_login
-    """
+def login_basic(driver, instance_url, username, password, wait_timeout):
     login_url = instance_url.rstrip("/") + "/login.do"
-    logger.info(f"Navigating to login page: {login_url}")
     driver.get(login_url)
+    WebDriverWait(driver, wait_timeout).until(EC.presence_of_element_located((By.ID, "user_name")))
+    driver.find_element(By.ID, "user_name").send_keys(username)
+    driver.find_element(By.ID, "user_password").send_keys(password)
+    driver.find_element(By.ID, "sysverb_login").click()
+    WebDriverWait(driver, wait_timeout).until_not(EC.url_contains("login.do"))
+    logger.info("Basic login successful.")
 
-    try:
-        WebDriverWait(driver, wait_timeout).until(
-            EC.presence_of_element_located((By.ID, "user_name"))
+def ensure_logged_in_sso(driver, first_url, wait_timeout):
+    driver.get(first_url)
+    logger.info("Complete SSO login manually if prompted...")
+    WebDriverWait(driver, wait_timeout).until(
+        EC.any_of(
+            EC.presence_of_element_located((By.ID, "gsft_main")),
+            EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly"))
         )
-    except Exception:
-        logger.warning("Login page didn't load as expected; trying fallback waits.")
+    )
 
-    # If your instance uses different IDs, update these selectors
+def switch_into_frame(driver):
     try:
-        user_field = driver.find_element(By.ID, "user_name")
-        pass_field = driver.find_element(By.ID, "user_password")
-        login_btn = driver.find_element(By.ID, "sysverb_login")
-    except Exception as e:
-        logger.error(f"Unable to locate login controls. Modify selectors. Error: {e}")
-        sys.exit(1)
-
-    user_field.clear()
-    user_field.send_keys(username)
-    pass_field.clear()
-    pass_field.send_keys(password)
-    login_btn.click()
-
-    # Wait until we are past login
-    try:
-        WebDriverWait(driver, wait_timeout).until_not(EC.url_contains("login.do"))
-        logger.info("Basic login successful.")
-    except Exception:
-        logger.error("Login did not progress past login page. Check credentials/selectors.")
-        sys.exit(1)
-
-
-def ensure_logged_in_sso(driver, first_target_url: str, wait_timeout: int):
-    """
-    For SSO: navigate to the first target URL and allow interactive auth.
-    """
-    logger.info("Starting SSO flow; navigate to first KB URL and complete any auth prompts.")
-    driver.get(first_target_url)
-
-    # Wait until either the KB view content/frame or URL indicates we're at kb_view
-    try:
-        WebDriverWait(driver, wait_timeout).until(
-            EC.any_of(
-                EC.presence_of_element_located((By.ID, "gsft_main")),
-                EC.url_contains("kb_view.do"),
-                EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly")),
-            )
-        )
-        logger.info("SSO appears complete; KB page/frame detected.")
-    except Exception:
-        logger.warning("SSO wait timed out; you may need to complete auth manually and rerun.")
-
-
-# ---------------------------
-# Frame handling (classic UI)
-# ---------------------------
-def switch_into_kb_frame_if_present(driver, wait_timeout: int) -> bool:
-    """
-    The classic UI often loads kb_view inside iframe#gsft_main.
-    This function tries to switch to that frame if present.
-    Returns True if switched, False if not found/needed.
-    """
-    try:
-        # Wait a bit for frame
-        WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.ID, "gsft_main"))
-        )
         driver.switch_to.frame("gsft_main")
-        logger.debug("Switched into iframe#gsft_main.")
         return True
-    except Exception:
-        # No frame found; page might already be the inner document
+    except:
         return False
 
+TITLE_SELECTORS = ["h1#articleTitleReadonly", "h1"]
+CONTENT_SELECTORS = ["div#article", "div.kb_article_content", "div.article-content"]
 
-# ---------------------------
-# Content extraction
-# ---------------------------
-TITLE_SELECTORS = [
-    "h1#articleTitleReadonly",  # your selector
-    "h1.kb-title",
-    "h1#article_title",
-    "h1.article-title",
-    "h1#kb_article_title",
-    "h1",
-]
-
-CONTENT_SELECTORS = [
-    "div.kb-view-content-wrapper",  # your selector
-    "div.kb_article_content",
-    "div.article-content",
-    "div#kb_content",
-    "div#article",
-    "div.kb-section",
-    "div#sc_content",
-]
-
-def extract_title_and_content_from_html(html: str) -> tuple[str, str]:
-    """Parse HTML and extract title + content using selector lists."""
+def extract_title_and_content(html):
     soup = BeautifulSoup(html, "lxml")
+    title = next((soup.select_one(sel).get_text(strip=True) for sel in TITLE_SELECTORS if soup.select_one(sel)), "Untitled")
+    content = next((soup.select_one(sel).get_text(separator="\n", strip=True) for sel in CONTENT_SELECTORS if soup.select_one(sel)), "No content found.")
+    return title, content
 
-    # Title
-    title_text = None
-    for sel in TITLE_SELECTORS:
-        node = soup.select_one(sel)
-        if node and node.get_text(strip=True):
-            title_text = node.get_text(strip=True)
-            break
-    if not title_text:
-        # Fallback: <title> or Untitled
-        page_title = soup.select_one("title")
-        title_text = page_title.get_text(strip=True) if page_title else "Untitled"
-
-    # Content
-    content_text = None
-    for sel in CONTENT_SELECTORS:
-        node = soup.select_one(sel)
-        if node:
-            content_text = node.get_text(separator="\n", strip=True)
-            break
-    if not content_text:
-        # Fallback: entire body text
-        body = soup.select_one("body")
-        content_text = body.get_text(separator="\n", strip=True) if body else "No content found."
-
-    return title_text, content_text
-
-
-def save_to_word(output_folder: Path, title: str, content: str) -> Path:
-    output_folder.mkdir(parents=True, exist_ok=True)
+def save_to_word(folder, title, content):
+    folder.mkdir(parents=True, exist_ok=True)
     fname = sanitize_filename(title)
-    path = ensure_unique_path(output_folder, fname, ".docx")
+    path = ensure_unique_path(folder, fname)
     doc = Document()
     doc.add_heading(title, 0)
-
-    # Split into paragraphs by blank lines or newlines
-    for para in re.split(r"\n{2,}", content.strip()):
-        lines = [ln for ln in para.split("\n") if ln.strip() != ""]
-        if not lines:
-            continue
-        for line in lines:
-            doc.add_paragraph(line)
-        doc.add_paragraph("")  # spacer between sections
-
+    for para in content.split("\n"):
+        doc.add_paragraph(para)
     doc.save(path)
     return path
 
-
-# ---------------------------
-# Main
-# ---------------------------
 def main():
-    cfg = load_config("config.ini")
+    cfg = load_config()
     sn = cfg["servicenow"]
-
-    instance_url = sn.get("instance_url", "").strip()
-    if not instance_url:
-        logger.error("instance_url is required in config.ini")
-        sys.exit(1)
-
+    instance_url = sn.get("instance_url")
     login_mode = sn.get("login_mode", "sso").lower()
     username = sn.get("username", "")
     password = sn.get("password", "")
-
     browser = sn.get("browser", "chrome")
     headless = sn.getboolean("headless", False)
     wait_timeout = sn.getint("wait_timeout", 25)
-
     excel_path = sn.get("urls_excel", "urls.xlsx")
     sheet = sn.get("excel_sheet", None)
     url_col = sn.get("url_column", None)
-
     output_folder = Path(sn.get("output_folder", "output"))
     delay_seconds = sn.getfloat("delay_seconds", 1.0)
 
     urls = read_urls_from_excel(excel_path, sheet, url_col)
-    logger.info(f"Found {len(urls)} URLs to crawl.")
-
     driver = create_driver(browser, headless)
 
     try:
         if login_mode == "basic":
-            if not (username and password):
-                logger.error("Basic login requires username and password in config.ini")
-                sys.exit(1)
             login_basic(driver, instance_url, username, password, wait_timeout)
         else:
-            # SSO: navigate to the first KB link to trigger SSO, then continue
             ensure_logged_in_sso(driver, urls[0], wait_timeout)
 
         for idx, url in enumerate(urls, start=1):
-            try:
-                logger.info(f"[{idx}/{len(urls)}] Opening: {url}")
-                driver.get(url)
-
-                # Try switching into classic UI KB iframe if present
-                switched = switch_into_kb_frame_if_present(driver, wait_timeout)
-
-                # Wait for either the title or the content selector to be present
-                try:
-                    WebDriverWait(driver, wait_timeout).until(
-                        EC.any_of(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly")),
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "div.kb-view-content-wrapper"))
-                        )
-                    )
-                except Exception:
-                    # Continue anyway; we'll parse what we have
-                    pass
-
-                # Get HTML from the right context: inside frame if switched, else main page
-                html = driver.page_source
-
-                # If we switched into iframe, go back to default to be safe for next URL
-                if switched:
-                    driver.switch_to.default_content()
-
-                title, content = extract_title_and_content_from_html(html)
-                saved_path = save_to_word(output_folder, title, content)
-                logger.info(f"Saved: {saved_path.name}")
-
-                time.sleep(delay_seconds)
-            except Exception as e:
-                logger.error(f"Error processing URL: {url}\n{e}")
-
+            logger.info(f"[{idx}/{len(urls)}] Processing: {url}")
+            driver.get(url)
+            switched = switch_into_frame(driver)
+            WebDriverWait(driver, wait_timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "h1#articleTitleReadonly"))
+            )
+            html = driver.page_source
+            if switched:
+                driver.switch_to.default_content()
+            title, content = extract_title_and_content(html)
+            saved_path = save_to_word(output_folder, title, content)
+            logger.info(f"Saved: {saved_path.name}")
+            time.sleep(delay_seconds)
     finally:
         driver.quit()
         logger.info("Done.")
