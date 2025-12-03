@@ -1,10 +1,31 @@
 Traceback (most recent call last):
-  File "c:\TOOLS\crawler\servicenow_crawler.py", line 177, in <module>
+  File "c:\TOOLS\crawler\servicenow_crawler.py", line 181, in <module>
     main()
-  File "c:\TOOLS\crawler\servicenow_crawler.py", line 156, in main
-    ensure_logged_in_sso(driver, urls[0], wait_timeout)
-  File "c:\TOOLS\crawler\servicenow_crawler.py", line 99, in ensure_logged_in_sso
+  File "c:\TOOLS\crawler\servicenow_crawler.py", line 166, in main
     WebDriverWait(driver, wait_timeout).until(
   File "C:\Users\YangMing\AppData\Local\Programs\Python\Python311\Lib\site-packages\selenium\webdriver\support\wait.py", line 138, in until
     raise TimeoutException(message, screen, stacktrace)
 selenium.common.exceptions.TimeoutException: Message:
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+        0x7ff74655a715
+        0x7ff74655a774
+        0x7ff74670c558
+        0x7ff7463140ce
+        0x7ff74631431b
+        0x7ff746350777
+        0x7ff74630b3d5
+        0x7ff74634e6f2
+        0x7ff74630a8aa
+        0x7ff746309bd1
+        0x7ff74630a6d3
+        0x7ff7463c81f4
+        0x7ff7463c4717
+        0x7ff746587375
+        0x7ff7465757d1
+        0x7ff74657dc79
+        0x7ff746561c64
+        0x7ff746561db3
+        0x7ff74654fae6
+        0x7fff2145259d
+        0x7fff2284af78
